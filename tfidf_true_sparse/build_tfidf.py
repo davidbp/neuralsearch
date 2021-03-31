@@ -31,6 +31,7 @@ if __name__ == '__main__':
     # tfidf_vectorizer = pickle.load(open("tfidf_vectorizer.pickle", "rb"))
 
 
-
 #            with gzip.open(abspath, 'rb') as fp:
 #                return np.frombuffer(fp.read(), dtype=self.dtype).reshape([-1, self.num_dim])
+
+

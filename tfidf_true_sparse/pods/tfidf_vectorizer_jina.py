@@ -22,9 +22,9 @@ class TFIDFTextEncoder(BaseEncoder):
         #print(f"\n\n printing self.path_vectorizer: {self.path_vectorizer} HOLAAAA\n\n")
         self.tfidf_vectorizer = pickle.load(open(self.path_vectorizer, "rb"))
 
-    @batching
-    @as_ndarray # makes sure the output is an ndarray
-    def encode(self, data: np.ndarray, *args, **kwargs) -> 'np.ndarray':
+#    @batching
+    #@as_ndarray # makes sure the output is an ndarray
+    def encode(self, data: np.ndarray, *args, **kwargs):
         """
         """
         #print("\n\n printing from tfidf.encode data:",

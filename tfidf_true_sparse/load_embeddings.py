@@ -4,7 +4,7 @@ import numpy as np
 
 
 def load_embeddings(path, num_dim):
-    
+    breakpoint()
     with gzip.open(path, 'rb') as fp:
         #import pdb;pdb.set_trace()
         b = fp.read()
