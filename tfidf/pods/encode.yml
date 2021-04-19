@@ -1,0 +1,6 @@
+!TFIDFTextEncoder
+#with:
+#  path_vectorizer: tfidf_vectorizer.pickle
+metas:
+  name: tfidf_encoder  # a customized name
+  uses: encoders/nlp/TFIDFTextEncoder/config.yml
