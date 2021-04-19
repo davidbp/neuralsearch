@@ -1,19 +1,15 @@
 !CompoundIndexer
 components:
-  - !NumpyIndexer
+  - !PysparnnIndexer
     with:
-      index_filename: vec.gz
-      compress_level: 1
+      prefix_filename: 'pysparnn'
     metas:
       name: vecidx
-      workspace: $WORKDIR
-      backend: scipy
   - !BinaryPbIndexer
     with:
       index_filename: doc.gz
     metas:
       name: docidx
-      workspace: $WORKDIR
 metas:
   name: doc_compound_indexer
   workspace: $WORKDIR
