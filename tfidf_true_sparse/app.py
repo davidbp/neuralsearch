@@ -5,7 +5,6 @@ import sys
 from jina.flow import Flow
 from jina import Document
 
-
 def config():
     """
     Configure environment variables.
@@ -17,8 +16,7 @@ def config():
     os.environ['WORKDIR'] = './workspace'
     os.makedirs(os.environ['WORKDIR'], exist_ok=True)
     os.environ['JINA_PORT'] = os.environ.get('JINA_PORT', str(65481))
-    os.environ['JINA_DATA_PATH'] = 'dataset/test_answers.csv'
-
+    os.environ['JINA_DATA_PATH'] = 'dataset/20newgroups.csv'
 
 def index_generator():
     """
@@ -33,11 +31,10 @@ def index_generator():
         for i, data in enumerate(reader):
             d = Document()
             # docid
-            d.tags['id'] = int(data[0])
+            d.tags['id'] = int(i)
             # doc
-            d.text = data[1]
+            d.text = data[0]
             yield d
-
 
 def index():
     """
@@ -49,24 +46,24 @@ def index():
         f.index(input_fn=index_generator, batch_size=16)
 
 
-def print_resp(resp, question):
+def print_resp(resp, document):
     """
     Print response.
     """
     for d in resp.search.docs:
-        print(f"🔮 Ranked list of answers to the question: {question} \n")
+        print(f"\n\n\nRanked list of related documents to the input query: \n")
 
         # d.matches contains the closests top_k documents in order 
         # from closer to farther from the query.
         for idx, match in enumerate(d.matches):
-
+            print('='*80)
             score = match.score.value
             if score < 0.0:
                 continue
             answer = match.text.strip()
             print(f'> {idx+1:>2d}. "{answer}"\n Score: ({score:.2f})')
-
-
+            print('='*80)
+    
 def search():
     """
     Search results using Query Flow.
@@ -75,31 +72,22 @@ def search():
 
     with f:
         while True:
-            text = input("Please type a question: ")
-            if not text:
-                break
+            file_path = input('Please type a file path for a query document: ')
 
+            while os.path.exists(file_path)==False:                
+                print(f'Previous file_path={file_path} cannot be found.' )
+                file_path = input('Please type a file path of a document:')
+            with open(file_path,'r') as file_:
+                text = file_.read()
+            
             def ppr(x):
-                #breakpoint()
                 print_resp(x, text)
 
-            #import pdb;pdb.set_trace()
-            f.search_lines(lines=[text, ], on_done=ppr, top_k=2, line_format=None)
+            f.search_lines(lines=[text, ], on_done=ppr, top_k=3, line_format=None)
 
-
-def dryrun():
-    """
-    Dry run.
-    """
-    f = Flow().load_config("flows/index.yml")
-    with f:
-        f.dry_run()
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print('choose between "index/search/dryrun" mode')
-        exit(1)
     if sys.argv[1] == 'index':
         config()
         index()

@@ -1,6 +1,5 @@
 !TFIDFTextEncoder
-#with:
-#  path_vectorizer: tfidf_vectorizer.pickle
 metas:
   name: tfidf_encoder  # a customized name
-  uses: encoders/nlp/TFIDFTextEncoder/config.yml
+with:
+  path_vectorizer: /Users/davidbuchaca1/Documents/git_stuff/neuralsearch/tfidf/pods/tfidf_vectorizer.pickle
