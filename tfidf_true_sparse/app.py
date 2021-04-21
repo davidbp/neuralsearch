@@ -58,8 +58,6 @@ def print_resp(resp, document):
         for idx, match in enumerate(d.matches):
             print('='*80)
             score = match.score.value
-            if score < 0.0:
-                continue
             answer = match.text.strip()
             print(f'> {idx+1:>2d}. "{answer}"\n Score: ({score:.2f})')
             print('='*80)

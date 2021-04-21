@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     data_path = "./dataset/20newgroups.csv"
     X = load_data(data_path)
-    tfidf_vectorizer = TfidfVectorizer()
+    tfidf_vectorizer = TfidfVectorizer(ngram_range=(1,2))
     tfidf_vectorizer.fit(X)
 
     # store the object to disk
