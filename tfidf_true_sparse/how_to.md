@@ -121,7 +121,4 @@ Here we can type `query.txt`  and we will get the related documents to `query.tx
 
 
 
-### Limitations [optional]:
 
-------------------------
-If there are known feature limitations that a user would expect to see mention them here.
