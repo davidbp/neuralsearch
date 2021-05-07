@@ -1,8 +1,0 @@
-jtype: MyExecutor
-with:
-  bar: 123
-metas:
-  name: awesomeness
-  description: my first awesome executor
-requests:
-  /random_work: foo
