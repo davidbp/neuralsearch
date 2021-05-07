@@ -1,0 +1,6 @@
+!TFIDFTextEncoder
+metas:
+  name: tfidf_encoder  # a customized name
+with:
+  #path_vectorizer: ./pods/tfidf_vectorizer.pickle
+  path_vectorizer: ./pods/tfidf_vectorizer.pickle
