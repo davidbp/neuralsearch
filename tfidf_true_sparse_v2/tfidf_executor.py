@@ -1,4 +1,3 @@
-
 __copyright__ = "Copyright (c) 2021 Jina AI Limited. All rights reserved."
 __license__ = "Apache-2.0"
 
@@ -6,23 +5,18 @@ import os
 import numpy as np
 import scipy
 from collections import OrderedDict
+import sklearn
+from sklearn import datasets
+from typing import Dict
 
 from jina import Executor, requests, DocumentArray, Document
-#from jina.executors.encoders import BaseEncoder
+from jina import Flow
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
-#from jina import Executor, requests, Flow, Document
 
 
 class TFIDFTextEncoder(Executor):
-    """Encode ``Document`` content from a `np.ndarray` (of strings) of length `BatchSize` into
-    a `csr_matrix` of shape `Batchsize x EmbeddingDimension`.
-
-    :param path_vectorizer: path containing the fitted tfidf encoder object
-    :param args: not used
-    :param kwargs: not used
-    """
 
     def __init__(
         self,
@@ -45,28 +39,11 @@ class TFIDFTextEncoder(Executor):
 
     @requests(on=['/index','/search'])
     def encode(self,docs: DocumentArray,  *args, **kwargs) -> DocumentArray:
-        """Encode the ``Document`` content creating a tf-idf feature vector of the input.
-
-        :param content: numpy array of strings containing the text data to be encoded
-        :param args: not used
-        :param kwargs: not used
-        """
-        #print(f'\n\nargs={args}')
-        #print(f'\n\nkwargs={kwargs}')
-        #print(f'\n\ndocs={docs}')
-        #print('\n\n')
-        #print(f'id(docs)={id(docs)}')
         iterable_of_texts = docs.get_attributes('text')
-
-        #docarray.embedding = self.tfidf_vectorizer.transform(iterable_of_texts)
         embedding_matrix = self.tfidf_vectorizer.transform(iterable_of_texts)
 
         for doc, doc_embedding in zip(docs, embedding_matrix):
             doc.embedding = doc_embedding
-
-        # if return docs # then data is empty
-        #return docs
-#        return None
 
 
 class SparseIndexer(Executor):
@@ -77,13 +54,8 @@ class SparseIndexer(Executor):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
-
-        # Dict[str, sparsearray]
         self.id_to_embedding = OrderedDict()
-
-        # Dict[str, Document]
         self.id_to_document = OrderedDict()
-
 
     @requests(on='/index')
     def add(self,docs:DocumentArray, *args, **kwargs):
@@ -93,32 +65,34 @@ class SparseIndexer(Executor):
             self.id_to_document[doc.id] = doc
 
     @requests(on='/search')
-    def query(self,docs:DocumentArray, *args, **kwargs):
-        top_k = 3
+    def query(self, docs: DocumentArray, parameters: Dict, *args, **kwargs):
+        top_k = int(parameters['top_k'])
 
-        print(';;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;')
-        print([scipy.sparse.csr_matrix(emb) for emb in self.id_to_embedding.values()])
-        print(';;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;')
+        def matrix_vector_distance(X,x):
+             distances = []
+             n_rows = X.shape[0]
+         
+             for k in range(n_rows):
+                 aux = X[k] - x
+                 distances.append((aux).multiply(aux).mean())
+                 
+             return distances
 
         X_embeddings = scipy.sparse.vstack([scipy.sparse.csr_matrix(emb) for emb in self.id_to_embedding.values()])
-
-        for x in X_embeddings:
+        indices = list(self.id_to_document.keys())
             
         for query in docs:
             # get closest top_k vector
-            print(X_embeddings.shape,scipy.sparse.csr_matrix(query.embedding).shape )
-            sorted_indices = np.argsort(X_embeddings - scipy.sparse.csr_matrix(query.embedding))# correct order?
+            query_emb = scipy.sparse.csr_matrix(query.embedding)
+            sorted_indices = np.argsort(matrix_vector_distance(X_embeddings, query_emb))# correct order?
 
             # get ids of closest vector
-            top_k_indices = sorted_indices[top_k]
-
+            top_k_indices = sorted_indices[0:top_k]
+            
             for index in top_k_indices:
-                query.matches.add(self.id_to_document[index])
+                query.matches.append(self.id_to_document[indices[index]])
 
         return None
-
-
-
 
 def print_embeddings(response):
     print(f'\nprint_embeddings\n\nresponse={response}\n\n\n')
@@ -128,44 +102,31 @@ def print_embeddings(response):
 def print_matches(response):
     print(f'\nprint_matches\n\nresponse={response}\n\n\n')
     for query in response.data.docs:
-        print('query.text={query.text}')
-        for match in query.matches:
-            print('match.text={match.text}')
+        print(f'\n\nquery.text={query.text}')
+        for i, match in enumerate(query.matches):
+            print(f'\n\n\nTOP={i}, match.text={match.text}')
 
+def get_20newsgroup_data():
+    data = sklearn.datasets.fetch_20newsgroups()
+    texts = data['data']
+    for text in texts:
+        d = Document(text=text)
+        yield d 
 
-from jina import Flow
+# Get data from sklearn
+data = sklearn.datasets.fetch_20newsgroups()
+texts = data['data']
+x_query = DocumentArray([Document(text=texts[100])])
+
 
 f = Flow().add(uses=TFIDFTextEncoder).add(uses=SparseIndexer)
-
-texts = ['Hello Bo', 'Hello Joan', 'Hello Kelton']
-docarray = DocumentArray([Document(text=x) for x in texts])
-
-
 with f:
    f.post(on='/index', 
-          request_size=32, 
-          on_done=print_embeddings,
-          inputs=docarray)
+          request_size=5000, 
+          inputs=get_20newsgroup_data)
 
    f.post(on='/search', 
-          request_size=32, 
+          request_size=640, 
+          parameters={'top_k' : 4},
           on_done=print_matches,
-          inputs=docarray)
-
-#f.post(on='/search', 
-#          request_size=32, 
-#          on_done=print_embeddings,
-#          inputs=docarray)
-
-#with f:
-#   f.post(on='/search', 
-#          request_size=32, 
-#          on_done=print_embeddings,
-#          inputs=docarray)
-
-
-
-
-
-
-
+          inputs=x_query)
