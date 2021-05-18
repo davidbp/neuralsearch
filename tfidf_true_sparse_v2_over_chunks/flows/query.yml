@@ -1,0 +1,12 @@
+!Flow
+with:
+  read_only: true
+pods:
+  encoder:
+    uses: pods/encode.yml
+    parallel: $JINA_PARALLEL
+    timeout_ready: 600000
+    read_only: true
+  doc_indexer:
+    uses: pods/doc.yml
+    timeout_ready: 100000

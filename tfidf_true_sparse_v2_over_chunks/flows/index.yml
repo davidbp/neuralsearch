@@ -1,0 +1,12 @@
+!Flow
+pods:
+  encoder:
+    uses: docker://jinahub/pod.encoder.tfidftextencoder:0.0.6-1.1.11
+    show_exc_info: true
+    parallel: 2
+    timeout_ready: 600000
+    read_only: true
+    #polling: any  (allows executors to run in parallel)
+  doc_indexer:
+    uses: pods/doc.yml
+    shards: $JINA_SHARDS

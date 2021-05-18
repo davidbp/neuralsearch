@@ -1,0 +1,15 @@
+!CompoundIndexer
+components:
+  - !PysparnnIndexer
+    with:
+      prefix_filename: 'pysparnn'
+    metas:
+      name: vecidx
+  - !BinaryPbIndexer
+    with:
+      index_filename: doc.gz
+    metas:
+      name: docidx
+metas:
+  name: doc_compound_indexer
+  workspace: $WORKDIR
