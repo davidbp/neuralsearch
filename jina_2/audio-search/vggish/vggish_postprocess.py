@@ -20,7 +20,7 @@ __license__ = "Apache-2.0"
 
 import numpy as np
 
-from jinahub.vggish_params import *
+from vggish.vggish_params import *
 
 
 class Postprocessor(object):

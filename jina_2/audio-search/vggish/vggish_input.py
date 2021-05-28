@@ -23,6 +23,7 @@ import resampy
 
 from vggish.mel_features import *
 from vggish.vggish_params import *
+import librosa
 
 try:
     import soundfile as sf
@@ -99,3 +100,21 @@ def wavfile_to_examples(wav_file):
     assert wav_data.dtype == np.int16, 'Bad sample type: %r' % wav_data.dtype
     samples = wav_data / 32768.0  # Convert to [-1.0, +1.0]
     return waveform_to_examples(samples, sr)
+
+
+def mp3_to_examples(mp3_file):
+    """Convenience wrapper around waveform_to_examples() for a common mp3 format.
+
+    Args:
+      mp3_file: String path to a file, or a file-like object. The file
+      is assumed to contain mp3 audio data.
+
+    Returns:
+      See waveform_to_examples.
+    """
+    x_data, sr = librosa.load(mp3_file)
+    #assert wav_data.dtype == np.int16, 'Bad sample type: %r' % wav_data.dtype
+    #samples = x_data / 32768.0  # Convert to [-1.0, +1.0]
+    return waveform_to_examples(x_data, sr)
+
+
