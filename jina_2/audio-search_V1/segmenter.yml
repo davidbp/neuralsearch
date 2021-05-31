@@ -1,0 +1,7 @@
+jtype: VggishSegmenter
+with:
+  window_length_secs: 1.0
+  show_exc_info: true
+metas:
+  py_modules: [executors.py, vggish/vggish_params.py, vggish/mel_features.py, vggish/vggish_input.py,vggish/vggish_slim.py, vggish/vggish_postprocess.py]
+
