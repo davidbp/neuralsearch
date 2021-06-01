@@ -6,12 +6,12 @@ import numpy as np
 import tensorflow as tf
 import soundfile as sf
 
-import vggish
 from vggish.vggish_input import waveform_to_examples
 from vggish.vggish_params import INPUT_TENSOR_NAME, OUTPUT_TENSOR_NAME
 from vggish.vggish_slim import load_vggish_slim_checkpoint, define_vggish_slim
 from vggish.vggish_postprocess import Postprocessor
 from jina import Executor, DocumentArray, requests, Document
+from scipy.spatial import distance
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -29,7 +29,6 @@ class VggishSegmenter(Executor):
     @requests()
     def segment(self, docs, *args, **kwargs):
         for doc in docs:
-            #data, sample_rate = self.read_wav(doc.uri)
             mel_data = self.wav2mel(doc.blob, doc.tags['sample_rate'])
             for idx, blob in enumerate(mel_data):
                 doc.chunks.append(Document(offset=idx, weight=1.0, blob=blob))
@@ -46,7 +45,6 @@ class VggishSegmenter(Executor):
         data = wav_data / sample_rate
 
         return data, sample_rate
-
 
 class VggishEncoder(Executor):
     
@@ -105,17 +103,6 @@ class Indexer(Executor):
     def index(self, docs: DocumentArray, *args, **kwargs):
         self._docs.extend(docs)
 
-    def _add_query_matches_from_chunks(self, query: Document, chunks: DocumentArray, *args, **kwargs):
-        parent_ids = chunks.get_attributes('parent_id')
-        matches = []
-        for parent_id in set(parent_ids):
-            chunks_with_common_parent = [chunk for chunk in chunks if chunk.parent_id == parent_id]
-            min_score = min([chunk.score.value for chunk in chunks_with_common_parent])
-            match = Document(self._docs[self.docid_to_docpos[parent_id]], copy=True, score=min_score)
-            matches.append(match)
-        query.matches.extend(DocumentArray(sorted(matches, key=lambda x: x.score.value)))
-
-
     @requests(on='/search')
     def search(self, docs: DocumentArray, parameters, **kwargs):
         top_k = int(parameters['top_k'])
@@ -123,12 +110,12 @@ class Indexer(Executor):
         for query in docs:
             q_emb = np.stack(query.chunks.get_attributes('embedding'))  # get all embedding from query docs
             euclidean_dist = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
+
             idx, euclidean_dist = self._get_sorted_top_k(euclidean_dist, top_k)
             for distances_row, query_chunk, idx_row in zip(euclidean_dist, query.chunks, idx):  # add & sort match
                 for i, distance in zip(idx_row, distances_row):
                     matching_chunk = Document(self._darray_chunks[int(i)], copy=True, score=distance)
                     query_chunk.matches.append(matching_chunk)
-
 
         self._rank(docs)
 
@@ -179,9 +166,3 @@ class Indexer(Executor):
     def close(self):
         os.makedirs(self.index_folder, exist_ok = True)
         self._docs.save(self.index_path)
-
-
-class DocIndexer(Executor):
-    @requests
-    def index(self, docs: DocumentArray, *args, **kwargs):
-        pass
