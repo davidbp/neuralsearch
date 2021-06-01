@@ -48,7 +48,6 @@ class VggishSegmenter(Executor):
         return data, sample_rate
 
 
-
 class VggishEncoder(Executor):
     
     def __init__(self, model_path: str=f'{cur_dir}/models/vggish_model.ckpt',
@@ -102,11 +101,9 @@ class Indexer(Executor):
         else:
             self._docs = DocumentArray() 
 
-
     @requests(on='/index')
     def index(self, docs: DocumentArray, *args, **kwargs):
         self._docs.extend(docs)
-
 
     def _add_query_matches_from_chunks(self, query: Document, chunks: DocumentArray, *args, **kwargs):
         parent_ids = chunks.get_attributes('parent_id')
@@ -116,23 +113,44 @@ class Indexer(Executor):
             min_score = min([chunk.score.value for chunk in chunks_with_common_parent])
             match = Document(self._docs[self.docid_to_docpos[parent_id]], copy=True, score=min_score)
             matches.append(match)
-
-
         query.matches.extend(DocumentArray(sorted(matches, key=lambda x: x.score.value)))
+
 
     @requests(on='/search')
     def search(self, docs: DocumentArray, parameters, **kwargs):
-        # top_k = parameters['top_k']
+        top_k = int(parameters['top_k'])
 
         for query in docs:
             q_emb = np.stack(query.chunks.get_attributes('embedding'))  # get all embedding from query docs
             euclidean_dist = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
-
-            for distances, query_chunk in zip(euclidean_dist, query.chunks):  # add & sort match
-                for i, distance in enumerate(distances):
+            idx, euclidean_dist = self._get_sorted_top_k(euclidean_dist, top_k)
+            for distances_row, query_chunk, idx_row in zip(euclidean_dist, query.chunks, idx):  # add & sort match
+                for i, distance in zip(idx_row, distances_row):
                     matching_chunk = Document(self._darray_chunks[int(i)], copy=True, score=distance)
                     query_chunk.matches.append(matching_chunk)
+
+
         self._rank(docs)
+
+    @staticmethod
+    def _get_sorted_top_k(dist: 'np.array', top_k: int) -> Tuple['np.ndarray', 'np.ndarray']:
+        """Find top-k smallest distances in ascending order.
+
+        Idea is to use partial sort to retrieve top-k smallest distances unsorted and then sort these
+        in ascending order. Equivalent to full sort but faster for n >> k. If k >= n revert to full sort.
+
+        """
+        if top_k >= dist.shape[1]:
+            idx = dist.argsort(axis=1)[:, :top_k]
+            dist = np.take_along_axis(dist, idx, axis=1)
+        else:
+            idx_ps = dist.argpartition(kth=top_k, axis=1)[:, :top_k]
+            dist = np.take_along_axis(dist, idx_ps, axis=1)
+            idx_fs = dist.argsort(axis=1)
+            idx = np.take_along_axis(idx_ps, idx_fs, axis=1)
+            dist = np.take_along_axis(dist, idx_fs, axis=1)
+
+        return idx, dist
 
     def _rank(self, docs, **kwargs):
         """
