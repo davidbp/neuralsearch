@@ -4,24 +4,19 @@ from collections import defaultdict
 
 import numpy as np
 import tensorflow as tf
+import soundfile as sf
+
 import vggish
 from vggish.vggish_input import waveform_to_examples
 from vggish.vggish_params import INPUT_TENSOR_NAME, OUTPUT_TENSOR_NAME
-
 from vggish.vggish_slim import load_vggish_slim_checkpoint, define_vggish_slim
-
 from vggish.vggish_postprocess import Postprocessor
-
 from jina import Executor, DocumentArray, requests, Document
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
-## think:
-## 1) chunks query time
-## 2) top k
-## 3) make code reading audio and sending it (instead, fill Docs with mp3)
-
 class VggishSegmenter(Executor):
+
     def __init__(self, window_length_secs=0.025, show_exc_info=True, *args, **kwargs):
         """
         :param frame_length: the number of samples in each frame
@@ -34,38 +29,31 @@ class VggishSegmenter(Executor):
     @requests()
     def segment(self, docs, *args, **kwargs):
         for doc in docs:
-            data, sample_rate = self.read_wav(doc.uri) # keep data blob and sample_rate as tag in tags
-            mel_data = self.wav2mel(data, sample_rate)
+            #data, sample_rate = self.read_wav(doc.uri)
+            mel_data = self.wav2mel(doc.blob, doc.tags['sample_rate'])
             for idx, blob in enumerate(mel_data):
-                #self.logger.debug(f'blob: {blob.shape}')
                 doc.chunks.append(Document(offset=idx, weight=1.0, blob=blob))
 
     def wav2mel(self, blob, sample_rate):
-        #self.logger.debug(f'blob: {blob.shape}, sample_rate: {sample_rate}')
         mel_spec = waveform_to_examples(blob, sample_rate).squeeze()
-        #self.logger.debug(f'mel_spec: {mel_spec.shape}')
         return mel_spec
 
-    def read_wav(self, uri):
-        import soundfile as sf
-        #print(f'\n\nuri={uri}\n\n')
-        #print(f'\n\nos.path.exists(uri)={os.path.exists(uri)}\n\n')
+    @staticmethod
+    def read_wav(uri):
         wav_data, sample_rate = sf.read(uri, dtype='int16')
-        #self.logger.debug(f'sample_rate: {sample_rate}')
         if len(wav_data.shape) > 1:
             wav_data = np.mean(wav_data, axis=1)
-        data = wav_data / sample_rate #32768.0
-        #print(f'data.shape={data.shape}\n\n')
-        #print(f'type(data)={type(data)}\n\n')
-        
+        data = wav_data / sample_rate
+
         return data, sample_rate
+
 
 
 class VggishEncoder(Executor):
     
     def __init__(self, model_path: str=f'{cur_dir}/models/vggish_model.ckpt',
                  pca_path: str=f'{cur_dir}/models/vggish_pca_params.npz', *args, **kwargs):
-        # INPUT_TENSOR_NAME is defiened in vggish_params.py
+
         super().__init__(*args, **kwargs)
         tf.compat.v1.reset_default_graph()
         self.model_path = model_path
@@ -114,6 +102,7 @@ class Indexer(Executor):
         else:
             self._docs = DocumentArray() 
 
+
     @requests(on='/index')
     def index(self, docs: DocumentArray, *args, **kwargs):
         self._docs.extend(docs)
@@ -131,11 +120,9 @@ class Indexer(Executor):
 
         query.matches.extend(DocumentArray(sorted(matches, key=lambda x: x.score.value)))
 
-    #@requests(on='/search')
+    @requests(on='/search')
     def search(self, docs: DocumentArray, parameters, **kwargs):
         # top_k = parameters['top_k']
-        # pairwise euclidean distance
-        #d = self._embedding_matrix  # get all embedding from stored docs
 
         for query in docs:
             q_emb = np.stack(query.chunks.get_attributes('embedding'))  # get all embedding from query docs
@@ -145,9 +132,6 @@ class Indexer(Executor):
                 for i, distance in enumerate(distances):
                     matching_chunk = Document(self._darray_chunks[int(i)], copy=True, score=distance)
                     query_chunk.matches.append(matching_chunk)
-        # M examples database
-        # query-> chunk[i].matches -> [d(x.emb, ),]
-        # self._add_query_matches_from_chunks(query_chunk, DocumentArray(matching_chunks))
         self._rank(docs)
 
     def _rank(self, docs, **kwargs):
@@ -163,7 +147,6 @@ class Indexer(Executor):
         for query in docs:
 
             parent_ids = defaultdict(list)
-            #parent_ids = {}
             for chunk in query.chunks:
                 for match in chunk.matches:
                     parent_ids[match.parent_id].append(match.score.value)
@@ -175,13 +158,9 @@ class Indexer(Executor):
 
             query.matches.sort(key=lambda x: x.score.value)
 
-
     def close(self):
         os.makedirs(self.index_folder, exist_ok = True)
         self._docs.save(self.index_path)
-
-
-
 
 
 class DocIndexer(Executor):
