@@ -34,6 +34,5 @@ def print_indices(response):
 
 f = Flow().add(uses=VggishSegmenter).add(uses=VggishEncoder).add(uses=Indexer)
 with f:
-    f.post('/search', inputs=documents,parameters={'top_k':5}, on_done=print_indices) #request_size
-
+    f.post('/search', inputs=documents,parameters={'top_k':10, 'distance':'cosine'}, on_done=print_indices) #request_size
 

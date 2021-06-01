@@ -11,7 +11,7 @@ from vggish.vggish_params import INPUT_TENSOR_NAME, OUTPUT_TENSOR_NAME
 from vggish.vggish_slim import load_vggish_slim_checkpoint, define_vggish_slim
 from vggish.vggish_postprocess import Postprocessor
 from jina import Executor, DocumentArray, requests, Document
-from scipy.spatial import distance
+from utils import cosine_vectorized
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -97,7 +97,7 @@ class Indexer(Executor):
             self.docid_to_docpos = {doc.id: i for i, doc in enumerate(self._docs)}
 
         else:
-            self._docs = DocumentArray() 
+            self._docs = DocumentArray()
 
     @requests(on='/index')
     def index(self, docs: DocumentArray, *args, **kwargs):
@@ -106,13 +106,18 @@ class Indexer(Executor):
     @requests(on='/search')
     def search(self, docs: DocumentArray, parameters, **kwargs):
         top_k = int(parameters['top_k'])
+        distance = parameters['distance']
 
         for query in docs:
             q_emb = np.stack(query.chunks.get_attributes('embedding'))  # get all embedding from query docs
-            euclidean_dist = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
 
-            idx, euclidean_dist = self._get_sorted_top_k(euclidean_dist, top_k)
-            for distances_row, query_chunk, idx_row in zip(euclidean_dist, query.chunks, idx):  # add & sort match
+            if distance == 'cosine':
+                dist_query_to_emb = cosine_vectorized(q_emb, self._embedding_matrix)
+            if distance == 'euclidean':
+                dist_query_to_emb = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
+
+            idx, dist_query_to_emb = self._get_sorted_top_k(dist_query_to_emb, top_k)
+            for distances_row, query_chunk, idx_row in zip(dist_query_to_emb, query.chunks, idx):  # add & sort match
                 for i, distance in zip(idx_row, distances_row):
                     matching_chunk = Document(self._darray_chunks[int(i)], copy=True, score=distance)
                     query_chunk.matches.append(matching_chunk)
