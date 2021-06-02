@@ -37,14 +37,6 @@ class VggishSegmenter(Executor):
         mel_spec = waveform_to_examples(blob, sample_rate).squeeze()
         return mel_spec
 
-    @staticmethod
-    def read_wav(uri):
-        wav_data, sample_rate = sf.read(uri, dtype='int16')
-        if len(wav_data.shape) > 1:
-            wav_data = np.mean(wav_data, axis=1)
-        data = wav_data / sample_rate
-
-        return data, sample_rate
 
 class VggishEncoder(Executor):
     
