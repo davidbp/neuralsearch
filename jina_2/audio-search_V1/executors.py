@@ -1,17 +1,17 @@
 import os
-from typing import Dict, Optional, List, Iterable, Union, Tuple
+from typing import Tuple
 from collections import defaultdict
 
 import numpy as np
 import tensorflow as tf
-import soundfile as sf
 
 from vggish.vggish_input import waveform_to_examples
 from vggish.vggish_params import INPUT_TENSOR_NAME, OUTPUT_TENSOR_NAME
 from vggish.vggish_slim import load_vggish_slim_checkpoint, define_vggish_slim
 from vggish.vggish_postprocess import Postprocessor
-from jina import Executor, DocumentArray, requests, Document
 from utils import cosine_vectorized
+
+from jina import Executor, DocumentArray, requests, Document
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -122,7 +122,6 @@ class Indexer(Executor):
 
         Idea is to use partial sort to retrieve top-k smallest distances unsorted and then sort these
         in ascending order. Equivalent to full sort but faster for n >> k. If k >= n revert to full sort.
-
         """
         if top_k >= dist.shape[1]:
             idx = dist.argsort(axis=1)[:, :top_k]
@@ -137,14 +136,17 @@ class Indexer(Executor):
         return idx, dist
 
     def _rank(self, docs, **kwargs):
-        """
-        For each query in docs, want to get the top k matches
+        """Rank the queries in docs. For each query in docs get the top k matches.
 
-        Group by parent ID: the score from parent query to parent match equals the minimum distance
+        This method groups by parent_id and uses as distance between a query and a Document the minimum distance
+        between any chunk of the query and any chunk of the Document.
 
-        q -> qc1,...qc10
-        doc1 -> c1,....c20   -> np.argmin(d(c1,qc1),...d(c20,qc1), ...d(c20,qc10))
-        docM -> c1,....c40   -> d(c1,qc1),...d(c40,qc1), ...d(c20,qc10)
+        Example:
+            If query has 3 chunks (qc1,...,qc3) and a Document has 40 chunks (c1,....c40) the distance between
+            the query and the Document is computed as
+            ```
+            d(q,d) = min( d(qc1, c1),... d(qc1, c40), d(qc2, c1),....,d(qc2, c40),d(qc3, c1),....,d(qc3, c40))
+            ```
         """
         for query in docs:
 
