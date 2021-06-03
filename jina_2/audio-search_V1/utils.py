@@ -1,4 +1,18 @@
 import numpy as np
+import librosa as lr
+import soundfile as sf
+
+def read_wav(file_path):
+    wav_data, sample_rate = sf.read(file_path, dtype='int16')
+    if len(wav_data.shape) > 1:
+        wav_data = np.mean(wav_data, axis=1)
+    data = wav_data / sample_rate
+    return data, sample_rate
+
+def read_mp3(file_path):
+    data, sample_rate = lr.load(file_path)
+    data = data / sample_rate
+    return data, sample_rate
 
 def _get_ones(x, y):
     return np.ones((x, y))
