@@ -1,0 +1,3 @@
+dgllife
+dgl
+conda install -c rdkit rdkit==2018.09.3
