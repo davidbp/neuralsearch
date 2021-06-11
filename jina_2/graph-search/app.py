@@ -4,6 +4,7 @@ from typing import Tuple
 import dgl
 import numpy as np
 import torch
+import pickle
 
 from jina.types.document.graph import GraphDocument
 from jina import Executor, requests, DocumentArray, Flow
@@ -16,7 +17,7 @@ def create_docs(dataset):
         tags={'molecule_str': molecule_str,
               'agg_features': dgl_graph.ndata['h'].detach().numpy().tolist(),
               'label':label.detach().numpy().tolist(),
-               'mask':mask.detach().numpy().tolist()}
+              'mask':mask.detach().numpy().tolist()}
         gdoc = GraphDocument.load_from_dgl_graph(dgl_graph)
         gdoc.tags = tags
         docs.append(gdoc)
@@ -44,13 +45,13 @@ class MoleculeEncoder(Executor):
             torch_features = torch.tensor(d.tags['agg_features'])
             d.embedding = self.model.forward(dgl_graph, feats=torch_features).detach().numpy()
 
+
 class Indexer(Executor):
 
     def __init__(self, index_folder=f'{cur_dir}/workspace/', *args, **kwargs):
         self.index_folder = index_folder
         self.index_path = os.path.join(self.index_folder,'docs.json')
         self._embedding_matrix = None
-        self._darray_chunks = None
         self.docid_to_docpos = None
 
         if os.path.exists(self.index_path):
@@ -79,12 +80,15 @@ class Indexer(Executor):
                 dist_query_to_emb = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
 
             idx, dist_query_to_emb = self._get_sorted_top_k(dist_query_to_emb, top_k)
-            for distances_row, idx_row in zip(dist_query_to_emb, idx): 
-                for i, distance in zip(idx_row, distances_row):
-                    matching_chunk = Document(self._darray_chunks[int(i)], copy=True, score=distance)
-                    query_chunk.matches.append(matching_chunk)
 
-        self._rank(docs)
+            # soted_idices[0] < soted_idices[1] < ...
+            sorted_indices = np.argosrt(dist_query_to_emb)
+
+            for idx in sorted_indices:
+                match = Document(self._docs[self.docid_to_docpos[idx]]) 
+                query.matches.append(match,copy=True, score=dist_query_to_emb[idx])
+
+        #self._rank(docs)
 
     @staticmethod
     def _get_sorted_top_k(dist: 'np.array', top_k: int) -> Tuple['np.ndarray', 'np.ndarray']:
@@ -105,24 +109,6 @@ class Indexer(Executor):
 
         return idx, dist
 
-    def _rank(self, docs, **kwargs):
-        """
-        Rank the queries in docs. For each query in docs get the top k matches.
-        """
-        for query in docs:
-
-            parent_ids = defaultdict(list)
-            for chunk in query.chunks:
-                for match in chunk.matches:
-                    parent_ids[match.parent_id].append(match.score.value)
-
-            for id in parent_ids.keys():
-                match = self._docs[self.docid_to_docpos[id]]
-                match.score = np.min(parent_ids[id])
-                query.matches.append(match)
-
-            query.matches.sort(key=lambda x: x.score.value)
-
     def close(self):
         os.makedirs(self.index_folder, exist_ok = True)
         self._docs.save(self.index_path)
@@ -136,12 +122,24 @@ def load_dataset():
     dataset = Tox21(smiles_to_bigraph, CanonicalAtomFeaturizer())
     return dataset
 
+
+def print_indices(response):
+    for doc in response.docs:
+        print(f"\n\nmolecule_str={doc.tags['molecule_str']}, score={doc.score}")
+
+
 if __name__ == '__main__':
+    n_queries = 3
 
     if sys.argv[1] == 'index':
         print('indexing started')
         dataset = load_dataset()
         documents = create_docs(dataset)
+
+        for i in range(n_queries):
+            file = open(f'query_{i}.pkl','wb')
+            pickle.dump(documents[i], file)
+            file.close()
 
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
@@ -149,16 +147,19 @@ if __name__ == '__main__':
             f.post('/index',
                    inputs=documents)
 
-
     elif sys.argv[1] == 'search':
+
+        queries = []
+        for i in range(n_queries):
+            query = pickle.load(open('query_{i}','rb'))
+            queries.append(query)
 
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
-            for i in range(4):
-                query = create_docs(data_files=[f'./data/query-{i}.mp3'])
+            for query in queries:
                 f.post('/search',
                        inputs=query,
-                       parameters={'top_k': 10, 'distance': 'euclidean'},
-                       on_done='')
+                       parameters={'top_k': 4, 'distance': 'euclidean'},
+                       on_done=print_indices)
     else:
         raise NotImplementedError(f'unsupported mode {sys.argv[1]}')
