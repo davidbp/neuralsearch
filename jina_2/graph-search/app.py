@@ -151,8 +151,10 @@ if __name__ == '__main__':
 
         queries = []
         for i in range(n_queries):
-            query = pickle.load(open('./query_{i}.pkl','rb'))
+            file = open(f'./query_{i}.pkl','rb')
+            query = pickle.load(file)
             queries.append(query)
+            file.close()
 
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
