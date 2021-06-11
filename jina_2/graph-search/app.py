@@ -137,7 +137,7 @@ if __name__ == '__main__':
         documents = create_docs(dataset)
 
         for i in range(n_queries):
-            file = open(f'query_{i}.pkl','wb')
+            file = open(f'./query_{i}.pkl','wb')
             pickle.dump(documents[i], file)
             file.close()
 
@@ -151,7 +151,7 @@ if __name__ == '__main__':
 
         queries = []
         for i in range(n_queries):
-            query = pickle.load(open('query_{i}','rb'))
+            query = pickle.load(open('./query_{i}.pkl','rb'))
             queries.append(query)
 
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
