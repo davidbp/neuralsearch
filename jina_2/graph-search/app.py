@@ -42,8 +42,7 @@ class MoleculeEncoder(Executor):
             dgl_graph = dgraph.to_dgl_graph()
             dgl_graph = dgl.add_self_loop(dgl_graph)
             torch_features = torch.tensor(d.tags['agg_features'])
-            d.embedding = model.forward(dgl_graph, feats=torch_features).detach().numpy()
-            print('d.embedding.shape=',d.embedding.shape)
+            d.embedding = self.model.forward(dgl_graph, feats=torch_features).detach().numpy()
 
 class Indexer(Executor):
 
