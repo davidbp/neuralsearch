@@ -137,10 +137,9 @@ if __name__ == '__main__':
         documents = create_docs(dataset)
 
         for i in range(n_queries):
-            file = open(f'./query_{i}.pkl','wb')
-            pickle.dump(documents[i], file)
-            file.close()
-
+            with open(f'./query_{i}.pkl','wb') as file:
+                pickle.dump(documents[i], file)
+            
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
             print('flow posted')
@@ -151,11 +150,10 @@ if __name__ == '__main__':
 
         queries = []
         for i in range(n_queries):
-            file = open(f'./query_{i}.pkl','rb')
-            query = pickle.load(file)
-            queries.append(query)
-            file.close()
-
+            with open(f'./query_{i}.pkl','rb') as file:
+                query = pickle.load(file)
+                queries.append(query)
+        
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
             for query in queries:
