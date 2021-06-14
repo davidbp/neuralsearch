@@ -53,7 +53,7 @@ class Indexer(Executor):
         distance = parameters['distance']
 
         for query in docs:
-            q_emb = np.stack([query.get_attributes('embedding')])
+            q_emb = np.array([query.get_attributes('embedding')])
 
             if distance == 'cosine':
                 dist_query_to_emb = cosine_vectorized(q_emb, self._embedding_matrix)
