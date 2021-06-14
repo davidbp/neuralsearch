@@ -25,7 +25,6 @@ class MoleculeEncoder(Executor):
             dgraph = GraphDocument(d)
             dgl_graph = dgraph.to_dgl_graph()
             dgl_graph = dgl.add_self_loop(dgl_graph)
-            #print(f'\n\n\n,d.tags.keys()={d.tags.keys()}\n\n\n')
             torch_features = torch.tensor(d.tags['agg_features'])
             d.embedding = self.model.forward(dgl_graph, feats=torch_features).detach().numpy().flatten()
 
@@ -67,8 +66,6 @@ class Indexer(Executor):
                 match = Document(self._docs[int(id)], score=dist)
                 query.matches.append(match)
 
-        #self._rank(docs)
-
     @staticmethod
     def _get_sorted_top_k(dist: 'np.array', top_k: int) -> Tuple['np.ndarray', 'np.ndarray']:
         """Find top-k smallest distances in ascending order.
@@ -85,7 +82,6 @@ class Indexer(Executor):
             idx_fs = dist.argsort(axis=1)
             idx = np.take_along_axis(idx_ps, idx_fs, axis=1)
             dist = np.take_along_axis(dist, idx_fs, axis=1)
-
 
         return idx.flatten(), dist.flatten()
 
