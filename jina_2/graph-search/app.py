@@ -7,8 +7,6 @@ from executors import MoleculeEncoder, Indexer
 from jina.types.document.graph import GraphDocument
 from jina import Flow, DocumentArray
 
-from utils import cosine_vectorized
-
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -17,8 +15,8 @@ def create_docs(dataset):
     for molecule_str, dgl_graph, label, mask in dataset:
         tags={'molecule_str': molecule_str,
               'agg_features': dgl_graph.ndata['h'].detach().numpy().tolist(),
-              'label':label.detach().numpy().tolist(),
-              'mask':mask.detach().numpy().tolist()}
+              'label': label.detach().numpy().tolist(),
+              'mask': mask.detach().numpy().tolist()}
         gdoc = GraphDocument.load_from_dgl_graph(dgl_graph)
         gdoc.tags = tags
         docs.append(gdoc)
@@ -65,7 +63,6 @@ if __name__ == '__main__':
         
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
-            #for query in queries:
             f.post('/search',
                    inputs=queries,
                    parameters={'top_k': 4, 'distance': 'euclidean'},
