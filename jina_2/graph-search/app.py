@@ -7,6 +7,8 @@ from executors import MoleculeEncoder, Indexer
 from jina.types.document.graph import GraphDocument
 from jina import Flow, DocumentArray
 
+from utils import cosine_vectorized
+
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -33,8 +35,9 @@ def load_dataset():
 
 def print_indices(response):
     for doc in response.docs:
-
-        print(f"\n\nmolecule_str={doc.tags['molecule_str']}, score={doc.score}")
+        print(f"\n\n\nmolecule_str_query={doc.tags['molecule_str']}")
+        for match in doc.matches:
+            print(f"molecule_str={match.tags['molecule_str']}, score={match.score}")
 
 
 if __name__ == '__main__':
@@ -46,7 +49,7 @@ if __name__ == '__main__':
         documents = create_docs(dataset)
 
         for i in range(n_queries):
-            with open(f'./query_{i}.pkl','wb') as file:
+            with open(f'./query_{i}.pkl', 'wb') as file:
                 pickle.dump(documents[i], file)
 
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
@@ -62,10 +65,10 @@ if __name__ == '__main__':
         
         f = Flow().add(uses=MoleculeEncoder).add(uses=Indexer)
         with f:
-            for query in queries:
-                f.post('/search',
-                       inputs=query,
-                       parameters={'top_k': 4, 'distance': 'euclidean'},
-                       on_done=print_indices)
+            #for query in queries:
+            f.post('/search',
+                   inputs=queries,
+                   parameters={'top_k': 4, 'distance': 'euclidean'},
+                   on_done=print_indices)
     else:
         raise NotImplementedError(f'unsupported mode {sys.argv[1]}')

@@ -5,7 +5,8 @@ import os
 from typing import Tuple
 
 from jina.types.document.graph import GraphDocument
-from jina import Executor, requests, DocumentArray
+from jina import DocumentArray, Document, Executor, requests
+from utils import cosine_vectorized, euclidean_vectorized
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
@@ -24,22 +25,25 @@ class MoleculeEncoder(Executor):
             dgraph = GraphDocument(d)
             dgl_graph = dgraph.to_dgl_graph()
             dgl_graph = dgl.add_self_loop(dgl_graph)
+            #print(f'\n\n\n,d.tags.keys()={d.tags.keys()}\n\n\n')
             torch_features = torch.tensor(d.tags['agg_features'])
-            d.embedding = self.model.forward(dgl_graph, feats=torch_features).detach().numpy()
+            d.embedding = self.model.forward(dgl_graph, feats=torch_features).detach().numpy().flatten()
 
 
 class Indexer(Executor):
 
     def __init__(self, index_folder=f'{cur_dir}/workspace/', *args, **kwargs):
         self.index_folder = index_folder
-        self.index_path = os.path.join(self.index_folder,'docs.json')
+        self.index_path = os.path.join(self.index_folder, 'docs.json')
         self._embedding_matrix = None
         self.docid_to_docpos = None
+        self.docpos_to_docid = None
 
         if os.path.exists(self.index_path):
             self._docs = DocumentArray.load(self.index_path)
             self._embedding_matrix = np.stack(self._docs.get_attributes('embedding')) 
             self.docid_to_docpos = {doc.id: i for i, doc in enumerate(self._docs)}
+            self.docpos_to_docid = {v: k for k, v in self.docid_to_docpos.items()}
 
         else:
             self._docs = DocumentArray()
@@ -54,21 +58,43 @@ class Indexer(Executor):
         distance = parameters['distance']
 
         for query in docs:
-            q_emb = np.stack(query.chunks.get_attributes('embedding'))  # get all embedding from query docs
+            #q_emb = query.embedding  # row vector (1, n_embedding)
+            q_emb = np.stack([query.get_attributes('embedding')])
+
+            print(f'\n\n\nq_emb.shape={q_emb.shape}\n\n\n')
+            print(f'\n\n\nself._embedding_matrix.shape={self._embedding_matrix.shape}\n\n\n')
 
             if distance == 'cosine':
                 dist_query_to_emb = cosine_vectorized(q_emb, self._embedding_matrix)
             if distance == 'euclidean':
-                dist_query_to_emb = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
+                #dist_query_to_emb = np.linalg.norm(q_emb[:, None, :] - self._embedding_matrix[None, :, :], axis=-1)
+                dist_query_to_emb = euclidean_vectorized(q_emb, self._embedding_matrix)
+
+            print(f'\n\n\ndist_query_to_emb.shape={dist_query_to_emb.shape}\n\n\n')
 
             idx, dist_query_to_emb = self._get_sorted_top_k(dist_query_to_emb, top_k)
 
-            # soted_idices[0] < soted_idices[1] < ...
-            sorted_indices = np.argosrt(dist_query_to_emb)
+            dist_query_to_emb = dist_query_to_emb.flatten()
 
-            for idx in sorted_indices:
-                match = Document(self._docs[self.docid_to_docpos[idx]]) 
-                query.matches.append(match,copy=True, score=dist_query_to_emb[idx])
+            # soted_idices[0] < soted_idices[1] < ...
+            sorted_indices = np.argsort(dist_query_to_emb)
+            sorted_distances = dist_query_to_emb[sorted_indices]
+
+            print(f'\n\n\nidx={idx}\n\n\n')
+            print(f'\n\n\ndist_query_to_emb={dist_query_to_emb}\n\n\n')
+            print(f'\n\n\nlen(self._docs)={len(self._docs)}\n\n\n')
+            print(f'\n\n\nsorted_indices={sorted_indices}\n\n\n')
+            print(f'\n\n\nsorted_distances={sorted_distances}\n\n\n')
+
+            for id, dist in zip(sorted_indices, sorted_distances):
+                #print(f'\n\n\nidx={idx}\n\n\n')
+                #print(f'\n\n\ntype(self.docid_to_docpos)={self.docid_to_docpos}\n\n\n')
+                #print(f'\n\n\nself.docid_to_docpos[idx]={self.docid_to_docpos[idx]}\n\n\n')
+                #print(f'\n\n\ndist_query_to_emb[int(id)]={dist_query_to_emb[int(id)]}\n\n\n')
+                #print(f'\n\n\nid={id}\n\n\n')
+                match = Document(self._docs[int(id)], score=dist)
+                print(f'\n\n\nmatch.score={match.score}\n\n\n')
+                query.matches.append(match)
 
         #self._rank(docs)
 
