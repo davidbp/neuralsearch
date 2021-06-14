@@ -1,4 +1,27 @@
+## Installation
 
+Please create a conda enviroment to install this example
+```
+conda create --name graph_search python=3.6
+```
+
+After creating an environment
+```
+conda activate graph_search
+```
+Then
+
+```
+pip install -r requirements.txt 
+```
+and
+```
+conda intall --file conda_requirements.txt
+```
+
+
+
+## Extra information
 
 This example uses the Dataset used in 
 ```
