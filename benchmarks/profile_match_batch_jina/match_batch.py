@@ -17,8 +17,7 @@ def create_arrays(n_1, n_2, n_features):
     np.random.seed(1234)
     x_mat = np.random.random((n_2, n_features))
     da_2 = DocumentArrayMemmap('./')
-    for x in x_mat:
-        da_2.extend([Document(embedding=x) for x in x_mat])
+    da_2.extend([Document(embedding=x) for x in x_mat])
     
     return da_1, da_2
 
