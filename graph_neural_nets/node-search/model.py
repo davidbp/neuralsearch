@@ -4,7 +4,7 @@ from torch.functional import F
 
 
 class GCN(torch.nn.Module):
-    def __init__(self, hidden_channels=128, num_node_features=1433, num_classes=7):
+    def __init__(self, num_node_features=1433, num_classes=7, hidden_channels=128):
         super(GCN, self).__init__()
         torch.manual_seed(12345)
         self.conv1 = GCNConv(num_node_features, hidden_channels)

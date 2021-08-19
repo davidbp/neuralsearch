@@ -11,10 +11,6 @@ from model import GCN
 import numpy as np
 import torch
 
-# TO REMOVE
-model = GCN()
-torch.save(model.state_dict(), 'model.pth')
-
 
 class SimpleIndexer(Executor):
     """
@@ -153,7 +149,7 @@ class SimpleIndexer(Executor):
 
 class NodeEncoder(Executor):
 
-    def __init__(self, model_path_state_dict='model.pth', *args, **kwargs):
+    def __init__(self, model_path_state_dict='saved_model.torch', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = GCN()
         self.model.load_state_dict(torch.load(model_path_state_dict))
@@ -230,12 +226,13 @@ def search():
 
     with f:
         # wait for input
-        print(f' Enter id to recommend from\n')
-        input_id = input()
-        matches = _search(f, input_id)
-        print(f' returned nodes {len(matches)}')
-        for match in matches:
-            print(f' match {match.id} with class {match.tags["class"]}')
+        while True:
+            print(f' Enter id to recommend from\n')
+            input_id = input()
+            matches = _search(f, input_id)
+            print(f' returned nodes {len(matches)}')
+            for match in matches:
+                print(f' match {match.id} with class {match.tags["class"]}')
 
 
 if __name__ == '__main__':
