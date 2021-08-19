@@ -1,28 +1,27 @@
-
-import torch_geometric
-
 from torch_geometric.datasets import Planetoid
 from torch_geometric.transforms import NormalizeFeatures
+
 
 def cora_loader(verbose=True):
     dataset = Planetoid(root='data/Planetoid',
                         name='Cora',
                         transform=NormalizeFeatures())
-    
+
     data = dataset[0]  # Get the first graph object.
-    
-    if verbose :
+
+    if verbose:
         print()
         print(f'Dataset: {dataset}:')
         print('======================')
         print(f'Number of graphs: {len(dataset)}')
         print(f'Number of features: {dataset.num_features}')
         print(f'Number of classes: {dataset.num_classes}')
-    
+
         print()
         print(data)
-        print('===========================================================================================================')
-        
+        print(
+            '===========================================================================================================')
+
         # Gather some statistics about the graph.
         print(f'Number of nodes: {data.num_nodes}')
         print(f'Number of edges: {data.num_edges}')
@@ -34,4 +33,3 @@ def cora_loader(verbose=True):
         print(f'Is undirected: {data.is_undirected()}')
 
     return data, dataset
-
