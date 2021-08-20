@@ -149,7 +149,8 @@ class SimpleIndexer(Executor):
 
 class NodeEncoder(Executor):
 
-    def __init__(self, model_path_state_dict='saved_model.torch', *args, **kwargs):
+    def __init__(self, model_path_state_dict='saved_model_random.torch'
+        , *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = GCN(num_node_features=300, num_classes=10, hidden_channels=128)
         self.model.load_state_dict(torch.load(model_path_state_dict))
@@ -244,7 +245,7 @@ def search():
             matches = _search(f, input_id)
             print(f' returned nodes {len(matches)}')
             for match in matches:
-                print(f' match {match.id} with url {match.tags["url"]} and label {match.tags["label"]}')
+                print(f' match {match.id} with url {match.tags["url"]}  \n label={match.tags["label"]}')
 
 
 if __name__ == '__main__':
