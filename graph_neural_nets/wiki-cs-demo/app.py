@@ -198,7 +198,7 @@ def _get_input_graph():
     edges = [(int(p[0]), int(p[1])) for p in zip(data.edge_index[0].numpy(), data.edge_index[1].numpy())]
     source_docs = []
     dest_docs = []
-    for i, o in enumerate(edges):
+    for i, o in edges:
         title_i, title_o = metadata['nodes'][i]['title'], metadata['nodes'][o]['title']
         label_i, label_o = metadata['nodes'][i]['label'], metadata['nodes'][o]['label']
         url_i, url_o = create_url(title_i), create_url(title_o)

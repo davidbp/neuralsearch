@@ -14,7 +14,6 @@ class GCN(torch.nn.Module):
         feature_map = None
 
         def get_activation(model, model_inputs, output):
-            print(f' output {output.shape}')
             nonlocal feature_map
             feature_map = output.detach()
 
