@@ -196,8 +196,9 @@ def _get_input_graph():
     gd = GraphDocument()
 
     edges = [(int(p[0]), int(p[1])) for p in zip(data.edge_index[0].numpy(), data.edge_index[1].numpy())]
-
-    for i, o in edges:
+    source_docs = []
+    dest_docs = []
+    for i, o in enumerate(edges):
         title_i, title_o = metadata['nodes'][i]['title'], metadata['nodes'][o]['title']
         label_i, label_o = metadata['nodes'][i]['label'], metadata['nodes'][o]['label']
         url_i, url_o = create_url(title_i), create_url(title_o)
@@ -213,11 +214,15 @@ def _get_input_graph():
                                 'title': title_o,
                                 'url': url_o,
                                 'label': label_o})
-        gd.add_edge(node_i, node_o)
 
-    for i, (x, y) in enumerate(zip(data.x, data.y)):
-        title = metadata['nodes'][i]['title']
-        label = metadata['nodes'][i]['label']
+        source_docs.append(node_i)
+        dest_docs.append(node_o)
+
+    gd.add_edges(source_docs, dest_docs)
+
+    for x, y, node in zip(data.x, data.y, metadata['nodes']):
+        title = node['title']
+        label = node['label']
         url = create_url(title)
         gd.add_node(Document(id=url,
                              blob=x.numpy(),
