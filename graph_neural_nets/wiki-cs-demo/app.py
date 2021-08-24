@@ -2,9 +2,9 @@ from typing import Dict, Optional, List
 
 from jina import Executor, requests, Document, DocumentArray, Flow
 from jina.types.arrays.memmap import DocumentArrayMemmap
-from jina_commons import get_logger
-
 from jina.types.document.graph import GraphDocument
+
+from jina_commons import get_logger
 from dataset_loader import data_loader
 from model import GCN
 
@@ -38,7 +38,7 @@ class SimpleIndexer(Executor):
             most similar embeddings. The distance metrics supported are the ones supported by `DocumentArray` match method.
         """
         super().__init__(**kwargs)
-        self._docs = DocumentArrayMemmap(self.workspace + f'/{index_file_name}')
+        self._docs = DocumentArrayMemmap(self.workspace + f'/{index_file_name}', key_length=128)
         self.default_traversal_paths = default_traversal_paths or ['r']
         self.default_top_k = default_top_k
         self._distance = distance_metric
@@ -144,13 +144,19 @@ class SimpleIndexer(Executor):
         if not docs:
             return
         for doc in docs:
-            doc.embedding = self._docs[doc.id].embedding
+            if doc.id in self._docs:
+                doc.embedding = self._docs[doc.id].embedding
+            else:
+                self.logger.debug(f'Document {doc.id} not found in index')
+
+    def close(self):
+        self._docs.save()
 
 
 class NodeEncoder(Executor):
 
-    def __init__(self, model_path_state_dict='saved_model_random.torch'
-        , *args, **kwargs):
+    def __init__(self, model_path_state_dict='saved_model.torch'
+                 , *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.model = GCN(num_node_features=300, num_classes=10, hidden_channels=128)
         self.model.load_state_dict(torch.load(model_path_state_dict))
@@ -183,6 +189,7 @@ class NodeEncoder(Executor):
 def create_url(title):
     return f'https://en.wikipedia.org/wiki/{title}'
 
+
 def _get_input_graph():
     data, dataset, metadata = data_loader()
 
@@ -190,22 +197,34 @@ def _get_input_graph():
 
     edges = [(int(p[0]), int(p[1])) for p in zip(data.edge_index[0].numpy(), data.edge_index[1].numpy())]
 
+    for i, o in edges:
+        title_i, title_o = metadata['nodes'][i]['title'], metadata['nodes'][o]['title']
+        label_i, label_o = metadata['nodes'][i]['label'], metadata['nodes'][o]['label']
+        url_i, url_o = create_url(title_i), create_url(title_o)
+        node_i = Document(id=url_i,
+                          blob=data.x[i].numpy(),
+                          tags={'class': int(data.y[i]),
+                                'title': title_i,
+                                'url': url_i,
+                                'label': label_i})
+        node_o = Document(id=url_o,
+                          blob=data.x[o].numpy(),
+                          tags={'class': int(data.y[o]),
+                                'title': title_o,
+                                'url': url_o,
+                                'label': label_o})
+        gd.add_edge(node_i, node_o)
+
     for i, (x, y) in enumerate(zip(data.x, data.y)):
         title = metadata['nodes'][i]['title']
         label = metadata['nodes'][i]['label']
-        
-        gd.add_node(Document(id=i,
+        url = create_url(title)
+        gd.add_node(Document(id=url,
                              blob=x.numpy(),
                              tags={'class': int(y),
-                                   'title':title,
-                                   'url': create_url(title),
+                                   'title': title,
+                                   'url': url,
                                    'label': label}))
-
-    nodes = gd.nodes
-
-    for i, o in edges:
-        gd.add_edge(nodes[i], nodes[o])
-
     return [gd]
 
 
@@ -214,19 +233,22 @@ def _get_input_request(input_id):
 
 
 def index():
+    graphs = _get_input_graph()
     f = Flow().add(uses=NodeEncoder).add(uses=SimpleIndexer,
                                          uses_with={'index_file_name': 'nodes',
                                                     'default_traversal_paths': ['c']},
                                          uses_metas={'workspace': 'tmp/'})
     with f:
-        f.index(inputs=_get_input_graph())
+        f.index(inputs=graphs)
 
 
 def search():
     def _search(f, input_id):
         resp = f.post(on='/fill_embedding', inputs=_get_input_request(input_id), return_results=True)
         new_query = resp[0].docs[0]
-        print(f' new_query {new_query}')
+        if new_query.embedding is None:
+            print(f' url is not in the index, nothing to recommend')
+            return []
         results = f.search(inputs=[new_query], return_results=True)
         matches = results[0].docs[0].matches
         return matches
@@ -240,7 +262,7 @@ def search():
     with f:
         # wait for input
         while True:
-            print(f' Enter id to recommend from\n')
+            print(f' Enter url to recommend from\n')
             input_id = input()
             matches = _search(f, input_id)
             print(f' returned nodes {len(matches)}')
